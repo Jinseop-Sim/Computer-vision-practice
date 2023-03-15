@@ -62,6 +62,7 @@ def convolve2d(array, filter):
   pad_value = (filter[0].size - 1) // 2
   padded_arr = np.pad(array, ((pad_value, pad_value), (pad_value, pad_value)), 'constant', constant_values=0)
 
+  # Convolution 계산식 들어갈 자리 (이중 for문 이용)
   print(padded_arr)
 
 #(b) Implement covolution after gaussian filter
@@ -70,5 +71,9 @@ def gaussconvolve2d(array, sigma):
   convolve2d(array, gauss_filter)
 
 #(c) Apply filter to real image
+# dog_image = Image.open('2b_dog.bmp')
+# dog_arr = np.asarray(dog_image)
+# filtered_dog_arr = gaussconvolve2d(dog_arr, 3)
+# filtered_dog_image = Image.fromarray(filtered_dog_arr)
 
-convolve2d([[1, 0, 0, 0, 1], [2, 3, 0, 8, 0], [2, 0, 0, 0, 3], [0, 0, 1, 0, 0]], gauss2d(0.5))
+# convolve2d([[1, 0, 0, 0, 1], [2, 3, 0, 8, 0], [2, 0, 0, 0, 3], [0, 0, 1, 0, 0]], gauss2d(0.5))
