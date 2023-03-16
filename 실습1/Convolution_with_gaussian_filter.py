@@ -58,13 +58,17 @@ def gauss2d(sigma):
 
 # HW2 - Part 1 : Convolution with gaussian filter
 #(a) Implement convolution
+
+# 2중 포문 내에서 Convolution을 진행하기 위해 미리 정의합니다.
 def convolution_function(curr_x, curr_y, kernel_size, padded_arr, filter):
   filtered_value = 0
-
+  
+  # 배열의 현재 칸을 중심으로 kernel 크기 만큼 loop가 돌아야 합니다.
   for i in range(-kernel_size, kernel_size + 1):
     for j in range(-kernel_size, kernel_size + 1):
       filtered_value += (padded_arr[i + curr_x][j + curr_y] * filter[i][j])
 
+  # kernel 크기 만큼 계산한 합을 배열의 현재 칸에 저장하기 위해 반환합니다.
   return filtered_value
 
 def convolve2d(array, filter):
@@ -75,22 +79,32 @@ def convolve2d(array, filter):
 
   # Convolution은 본래 배열을 180도 회전시킨 뒤, Cross correlation을 진행합니다.
   # 따라서 np.rot90 함수를 통해 회전함을 명시적으로 나타냅니다.
-  # 하지만, 사실 해당 Filter은 회전을 해도 같은 배열이라 회전하지 않아도 같습니다.
-  for i in range(1, len(array) + pad_value):
-    for j in range(1, array[0].size + pad_value):
-      array[i-1][j-1] = convolution_function(i, j, pad_value, padded_arr, np.rot90(filter, 2))
+  # 하지만, 사실 해당 filter은 회전을 해도 동일한 형태를 유지하는 대칭 배열입니다.
+  for i in range(pad_value, len(array) + pad_value):
+    for j in range(pad_value, array[0].size + pad_value):
+      array[i-pad_value][j-pad_value] = convolution_function(i, j, pad_value, padded_arr, np.rot90(filter, 2))
 
 #(b) Implement covolution after gaussian filter
+# 위에서 이미 선언한 gauss2d 함수를 통해 filter를 생성합니다.
+# 이후 image와 해당 filter에 대해 convolution을 진행합니다.
 def gaussconvolve2d(array, sigma):
   gauss_filter = gauss2d(sigma)
   convolve2d(array, gauss_filter)
 
 #(c) Apply filter to real image
-# dog_image = Image.open('2b_dog.bmp')
-# dog_arr = np.asarray(dog_image)
-# filtered_dog_arr = gaussconvolve2d(dog_arr, 3)
-# filtered_dog_image = Image.fromarray(filtered_dog_arr)
+# 먼저 filter는 2d array이기 때문에, greyscale로 image를 open합니다.
+# np.asarray를 통해 배열로 바꾸는데, 해당 배열은 immutable한 배열입니다.
+# 따라서 copy 함수를 통해 mutable한 배열을 생성해줍니다.
+dog_image = Image.open('./hw2_image/2b_dog.bmp').convert('L')
+dog_arr = np.asarray(dog_image)
+copied_dog_arr = dog_arr.copy()
+
+# 생성된 배열에 gauss filter + convolution을 진행합니다.
+# 이후 Local 환경에 filtering된 image를 저장합니다.
+gaussconvolve2d(copied_dog_arr, 3)
+filtered_dog_image = Image.fromarray(copied_dog_arr)
+filtered_dog_image.save('./hw2_image/filtered_dog.png', 'PNG')
 
 #(d) Show origin and filtered image
-
-gaussconvolve2d(np.array([[1, 0, 0, 0, 1], [2, 3, 0, 8, 0], [2, 0, 0, 0, 3], [0, 0, 1, 0, 0]]), 0.5)
+dog_image.show()
+filtered_dog_image.show()
