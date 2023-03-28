@@ -5,3 +5,4 @@
 
 실습 1 : Convolution with gaussian filter  
 실습 2 : Hybrid image (filtered by gaussian)  
+실습 3 : Edge detection (with Sobel operator)
