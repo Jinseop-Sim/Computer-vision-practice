@@ -132,10 +132,14 @@ def dfs(img, res, i, j, visited=[]):
         for jj in range(j-1, j+2) :
             if (img[ii, jj] == 80) and ((ii, jj) not in visited) :
                 dfs(img, res, ii, jj, visited)
+                # 더 이상 연결된 Strong이 없는 pixel은 0으로 만들어준다.
+                # 이렇게 0으로 만들어 주지 않으면 너무 많은 pixel이 계속 연결된다.
+                res[ii, jj] = 0
 
 def hysteresis(img):
     res = img.copy()
-
+    
+    # DFS를 왼쪽 위 부터 점마다 모두 진행해준다.
     for i in range(1, len(img) - 1):
        for j in range(1, len(img[0]) - 1):
                 dfs(img, res, i, j, visited=[])
