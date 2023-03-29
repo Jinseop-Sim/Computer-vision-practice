@@ -2,9 +2,6 @@ from PIL import Image
 import math
 import numpy as np
 
-"""
-Get and use the functions associated with gaussconvolve2d that you used in the last HW02.
-"""
 def density_function(x, sigma):
   return math.exp(-x**2 / (2 * (sigma**2)))
 
@@ -121,7 +118,7 @@ def double_thresholding(img):
 
     return res
 
-def dfs(img, res, i, j, visited):
+def dfs(img, res, i, j, visited=[]):
     # 호출된 시점의 시작점 (i, j)은 최초 호출이 아닌 이상 
     # strong 과 연결된 weak 포인트이므로 res에 strong 값을 준다
     if(len(visited) > 0):
@@ -138,13 +135,10 @@ def dfs(img, res, i, j, visited):
 
 def hysteresis(img):
     res = img.copy()
-    visited = []
 
     for i in range(1, len(img) - 1):
        for j in range(1, len(img[0]) - 1):
-            if (i, j) not in visited:
-                print(i, j)
-                dfs(img, res, i, j, visited)
+                dfs(img, res, i, j, visited=[])
 
     return res
 
