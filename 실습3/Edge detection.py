@@ -5,14 +5,6 @@ import numpy as np
 """
 Get and use the functions associated with gaussconvolve2d that you used in the last HW02.
 """
-def check_outlier(array):
-   for i in range (0, len(array)):
-    for j in range (0, len(array[0])):
-      if(array[i][j] > 255):
-        array[i][j] = 255
-      if(array[i][j] < 0):
-        array[i][j] = 0
-
 def density_function(x, sigma):
   return math.exp(-x**2 / (2 * (sigma**2)))
 
@@ -34,43 +26,44 @@ def gauss2d(sigma):
 
   return normalized_gauss_arr_2d
 
-def convolve2d(array,filter):
+def convolve2d(array, filter):
   kernel_size = len(filter)
   pad_value = (kernel_size - 1) // 2
   padded_arr = np.pad(array, ((pad_value, pad_value), (pad_value, pad_value)), 'constant', constant_values=0)
   rotated_filter = np.rot90(filter, 2)
 
+  # 불필요한 Copy 함수의 사용을 줄이고자, return하는 방식으로 변경했습니다.
+  result = np.ones((len(array), len(array[0]))).astype(np.float32)
+
   for i in range(len(array)):
     for j in range(len(array[0])):
-      array[i][j] = np.sum(padded_arr[i : i + kernel_size, j : j + kernel_size] * rotated_filter)
+      result[i][j] = np.sum(padded_arr[i : i + kernel_size, j : j + kernel_size] * rotated_filter)
+
+  return result
 
 def gaussconvolve2d(array,sigma):
   gauss_filter = gauss2d(sigma)
-  convolve2d(array, gauss_filter)
+  result = convolve2d(array, gauss_filter)
+
+  return result
 
 def sobel_filters(img):
-    x_sobel_filters = np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]])
-    y_sobel_filters = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
+    # X축, Y축 Sobel Kernel을 각각 선언한다.
+    # Convolution은 Filter를 180도 회전하기 때문에, 반전된 Kernel을 선언한다.
+    x_sobel_filters = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
+    y_sobel_filters = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], np.float32)
+    # Image의 X축 Y축 변화량 검출을 위해 Convolution을 진행한다.
+    iguana_x_gradient = convolve2d(img, x_sobel_filters)
+    iguana_y_gradient = convolve2d(img, y_sobel_filters)
+    # 나온 결과를 합치기 위해 직각 삼각형 빗변 함수를 이용한다.
+    # 그리고 올바른 magnitude를 구하기 위해 값을 255 범위 내로 Mapping 해주어야 한다.
+    # HW02의 과제 설명에서 언급된 대로 np.where()을 사용합니다.
+    G = np.hypot(iguana_x_gradient, iguana_y_gradient)
+    G = np.where(G < 0, 0, G)
+    G = np.where(G > 255, 255, G)
 
-    differential_iguana_x = img.copy()
-    differential_iguana_y = img.copy()
-
-    convolve2d(differential_iguana_x, x_sobel_filters)
-    convolve2d(differential_iguana_y, y_sobel_filters)
-
-    G = np.hypot(differential_iguana_x, differential_iguana_y)
-    theta = np.arctan2(differential_iguana_x, differential_iguana_y)
-    """ Returns gradient magnitude and direction of input img.
-    Args:
-        img: Grayscale image. Numpy array of shape (H, W).
-    Returns:
-        G: Magnitude of gradient at each pixel in img.
-            Numpy array of shape (H, W).
-        theta: Direction of gradient at each pixel in img.
-            Numpy array of shape (H, W).
-    Hints:
-        - Use np.hypot and np.arctan2 to calculate square root and arctan
-    """
+    # 그리고, 각 Pixel들의 변화 방향을 알기 위해 arctan2 함수를 이용한다.
+    theta = np.arctan2(iguana_x_gradient, iguana_y_gradient)
     return (G, theta)
 
 def non_max_suppression(G, theta):
@@ -83,7 +76,35 @@ def non_max_suppression(G, theta):
     Returns:
         res: non-maxima suppressed image.
     """
-    pass
+    # 0, 45, 90, 135를 검사하는 것은 주변 8방향의 Intensity를 모두 검사하기 위함이다.
+    # 먼저, Radian 값을 각도로 돌리기 위해 아래의 식을 이용한다.
+    angle = theta / 180 * np.pi
+    res = np.zeros(G.shape)
+
+    for i in range(1, len(G)-1):
+       for j in range(1, len(G[0])-1):
+            # 중심 점 기준 0도 선분이 좌우 점 (0도)
+            if (0 <= angle[i][j] < 22.5) or (157.5 <= angle[i][j] <= 180) or (-22.5 <= angle[i][j] < 0) or (-180 <= angle[i][j] < -157.5):
+                left_ptr = G[i][j+1]
+                right_ptr = G[i][j-1]
+            # 중심 점 기준 45도 선분의 좌우 점
+            elif (22.5 <= angle[i][j] < 67.5) or (-157.5 <= angle[i][j] < -112.5):
+                left_ptr = G[i+1][j+1]
+                right_ptr = G[i-1][j-1]
+            # 중심 점 기준 90도 선분의 좌우 점
+            elif (67.5 <= angle[i][j] < 112.5) or (-112.5 <= angle[i][j] < -67.5):
+                left_ptr = G[i+1][j]
+                right_ptr = G[i-1][j]
+            # 중심 점 기준 135도 선분의 좌우 점
+            elif (112.5 <= angle[i][j] < 157.5) or (-67.5 <= angle[i][j] < -22.5):
+                left_ptr = G[i+1][j-1]
+                right_ptr = G[i-1][j+1]  
+          
+            if(G[i][j] >= left_ptr) and (G[i][j] >= right_ptr):
+                res[i][j] = G[i][j]
+            else:
+               res[i][j] = 0
+
     return res
 
 def double_thresholding(img):
@@ -93,7 +114,6 @@ def double_thresholding(img):
     Returns:
         res: double_thresholded image.
     """
-    pass
     return res
 
 def dfs(img, res, i, j, visited=[]):
@@ -131,22 +151,28 @@ def hysteresis(img):
 iguana_image = Image.open('./iguana.bmp').convert('L')
 iguana_array = np.asarray(iguana_image)
 copied_iguana_array = iguana_array.copy()
+# astype('float32')가 동작하지 않는 문제가 확인되어 astype(np.float32) 형식으로 모두 교체 했습니다.
 copied_iguana_array.astype(np.float32)
 
-gaussconvolve2d(copied_iguana_array, 1.6)
-copied_iguana_array.astype(np.uint8)
-filtered_iguana_image = Image.fromarray(copied_iguana_array)
+copied_iguana_array = gaussconvolve2d(copied_iguana_array, 1.6)
+filtered_iguana_image = Image.fromarray(copied_iguana_array.astype(np.uint8))
 filtered_iguana_image.save('./filtered_iguana.png', 'PNG')
 
 # 2. Apply sobel operator to image
-iguana_array_for_sobel = iguana_array.copy()
-(iguana_magnitude, iguana_theta) = sobel_filters(iguana_array_for_sobel)
-
-iguana_magnitude = np.array(iguana_magnitude).astype(np.uint8)
-iguana_theta = np.array(iguana_theta).astype(np.uint8)
-check_outlier(iguana_magnitude)
-
-iguana_magnitude_image = Image.fromarray(iguana_magnitude)
-iguana_theta_image = Image.fromarray(iguana_theta)
+# 위에서 Gaussian filter를 통해 noise를 제거한 사진을 가져온다.
+# 해당 사진의 X축 Gradient와 Y축 Gradient를 구해야 하는데, 
+# Sobel filter를 사진과 Convolution 하면, X축 Y축 변화량을 각각 구할 수 있다.
+(iguana_magnitude, iguana_theta) = sobel_filters(copied_iguana_array.astype(np.float32))
+iguana_magnitude_image = Image.fromarray(iguana_magnitude.astype(np.uint8))
 iguana_magnitude_image.save('./iguana_magnitude.png', 'PNG')
-iguana_theta_image.save('./iguana_theta.png', 'PNG')
+
+# 3. Apply non-max suppression to image
+# Sobel filter를 적용한 사진에서 얇은 Edge만 따내기 위한 작업이다.
+# 3x3에서 주변 8방향 값보다 작은 중심 값을 제거하는 과정이다.
+non_max_iguana = non_max_suppression(iguana_magnitude, iguana_theta)
+non_max_iguana_image = Image.fromarray(non_max_iguana.astype(np.uint8))
+non_max_iguana_image.save('./non_max_iguana.png', 'PNG')
+
+# 4. Double thresholding
+# 2개의 역치 값을 두어, Strong edge, weak edge로 구별한다.
+# Edge를 좀 더 선명하게 강화하는 작업이다.
