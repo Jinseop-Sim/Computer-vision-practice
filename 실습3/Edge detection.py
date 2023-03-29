@@ -33,7 +33,7 @@ def convolve2d(array, filter):
   rotated_filter = np.rot90(filter, 2)
 
   # 불필요한 Copy 함수의 사용을 줄이고자, return하는 방식으로 변경했습니다.
-  result = np.ones((len(array), len(array[0]))).astype(np.float32)
+  result = np.zeros(array.shape, dtype = np.float32)
 
   for i in range(len(array)):
     for j in range(len(array[0])):
@@ -58,28 +58,21 @@ def sobel_filters(img):
     # 나온 결과를 합치기 위해 직각 삼각형 빗변 함수를 이용한다.
     # 그리고 올바른 magnitude를 구하기 위해 값을 255 범위 내로 Mapping 해주어야 한다.
     # HW02의 과제 설명에서 언급된 대로 np.where()을 사용합니다.
+    # np.where()의 기본 기능은 index(좌표)의 반환이지만, 아래의 형태는 값을 바꿔 배열을 return한다.
     G = np.hypot(iguana_x_gradient, iguana_y_gradient)
     G = np.where(G < 0, 0, G)
     G = np.where(G > 255, 255, G)
+    #G = G/G.max() * 255
 
     # 그리고, 각 Pixel들의 변화 방향을 알기 위해 arctan2 함수를 이용한다.
     theta = np.arctan2(iguana_x_gradient, iguana_y_gradient)
     return (G, theta)
 
 def non_max_suppression(G, theta):
-    """ Performs non-maximum suppression.
-    This function performs non-maximum suppression along the direction
-    of gradient (theta) on the gradient magnitude image (G).
-    Args:
-        G: gradient magnitude image with shape of (H, W).
-        theta: direction of gradients with shape of (H, W).
-    Returns:
-        res: non-maxima suppressed image.
-    """
     # 0, 45, 90, 135를 검사하는 것은 주변 8방향의 Intensity를 모두 검사하기 위함이다.
     # 먼저, Radian 값을 각도로 돌리기 위해 아래의 식을 이용한다.
     angle = theta / 180 * np.pi
-    res = np.zeros(G.shape)
+    res = np.zeros(G.shape, dtype = np.float32)
 
     for i in range(1, len(G)-1):
        for j in range(1, len(G[0])-1):
@@ -108,18 +101,31 @@ def non_max_suppression(G, theta):
     return res
 
 def double_thresholding(img):
-    """ 
-    Args:
-        img: numpy array of shape (H, W) representing NMS edge response.
-    Returns:
-        res: double_thresholded image.
-    """
+    # 문제에 나온 역치 값들을 미리 정의한다.
+    diff = img.max() - img.min()
+    high_thresh = img.min() + diff * 0.15
+    low_thresh = img.min() + diff * 0.03
+    strong_constant = 255
+    weak_constant = 80
+
+    # 결과를 담을 배열을 만든다.
+    res = np.zeros(img.shape, dtype = np.float32)
+    # np.where의 기본 기능을 이용해 역치 범위의 좌표들을 뽑아낸다.
+    strong_x, strong_y = np.where(img >= high_thresh)
+    weak_x, weak_y = np.where((img >= low_thresh) & (img < high_thresh))
+
+    # Numpy의 기능으로 아래와 같이 assign을 할 수 있다.
+    # Strong_x, Strong_y 배열에 해당되는 모든 좌표에 한 번에 assign한다.
+    res[strong_x, strong_y] = strong_constant
+    res[weak_x, weak_y] = weak_constant
+
     return res
 
-def dfs(img, res, i, j, visited=[]):
+def dfs(img, res, i, j, visited):
     # 호출된 시점의 시작점 (i, j)은 최초 호출이 아닌 이상 
     # strong 과 연결된 weak 포인트이므로 res에 strong 값을 준다
-    res[i, j] = 255
+    if(len(visited) > 0):
+        res[i, j] = 255
 
     # 이미 방문했음을 표시한다
     visited.append((i, j))
@@ -131,17 +137,15 @@ def dfs(img, res, i, j, visited=[]):
                 dfs(img, res, ii, jj, visited)
 
 def hysteresis(img):
-    """ Find weak edges connected to strong edges and link them.
-    Iterate over each pixel in strong_edges and perform depth first
-    search across the connected pixels in weak_edges to link them.
-    Here we consider a pixel (a, b) is connected to a pixel (c, d)
-    if (a, b) is one of the eight neighboring pixels of (c, d).
-    Args:
-        img: numpy array of shape (H, W) representing NMS edge response.
-    Returns:
-        res: hysteresised image.
-    """
-    pass
+    res = img.copy()
+    visited = []
+
+    for i in range(1, len(img) - 1):
+       for j in range(1, len(img[0]) - 1):
+            if (i, j) not in visited:
+                print(i, j)
+                dfs(img, res, i, j, visited)
+
     return res
 
 #  1. Apply gausian filter with sigma 1.6
@@ -169,10 +173,21 @@ iguana_magnitude_image.save('./iguana_magnitude.png', 'PNG')
 # 3. Apply non-max suppression to image
 # Sobel filter를 적용한 사진에서 얇은 Edge만 따내기 위한 작업이다.
 # 3x3에서 주변 8방향 값보다 작은 중심 값을 제거하는 과정이다.
-non_max_iguana = non_max_suppression(iguana_magnitude, iguana_theta)
+non_max_iguana = non_max_suppression(iguana_magnitude.astype(np.float32), iguana_theta.astype(np.float32))
 non_max_iguana_image = Image.fromarray(non_max_iguana.astype(np.uint8))
 non_max_iguana_image.save('./non_max_iguana.png', 'PNG')
 
 # 4. Double thresholding
 # 2개의 역치 값을 두어, Strong edge, weak edge로 구별한다.
 # Edge를 좀 더 선명하게 강화하는 작업이다.
+thresholded_iguana = double_thresholding(non_max_iguana.astype(np.float32))
+thresholded_iguana_image = Image.fromarray(thresholded_iguana.astype(np.uint8))
+thresholded_iguana_image.save('./thresholded_iguana.png', 'PNG')
+
+# 5. Hysteresis(이력 현상)
+# 마지막 단계인 Edge tracking 단계이다.
+# 8방향을 검사해, 인접한 Edge가 Strong Edge이면?
+# Weak edge를 Strong edge를 바꾸는 작업을 dfs로 진행한다.
+iguana_edge = hysteresis(thresholded_iguana.astype(np.float32))
+iguana_edge_image = Image.fromarray(iguana_edge.astype(np.uint8))
+iguana_edge_image.save('./iguana_edge.png', 'PNG')
