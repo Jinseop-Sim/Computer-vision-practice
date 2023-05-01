@@ -30,13 +30,36 @@ def RANSACFilter(
     assert isinstance(orient_agreement, float)
     assert isinstance(scale_agreement, float)
     ## START
-
+    # RANSAC은 반드시 10회 진행으로 고정합니다.
+    largest_set = []
+    for i in range(10):
+        # SIFT의 결과로 등장한 matched_pair 중 random point를 고릅니다.
+        rand = random.randrange(0, len(matched_pairs))
+        choice = matched_pairs[rand]
+        # Readkey 함수로부터 구해진 keypoint간의 각도와 Scale을 계산합니다.
+        # Image 1에서 Image 2로 match 되었을 때, 변화량을 계산하는 것입니다.
+        orientation = (keypoints1[choice[0]][3] - keypoints2[choice[1]][3]) % (2*math.pi)
+        scale = keypoints2[choice[1]][2] / keypoints1[choice[0]][2]
+        temp =[]
+        # 모든 Matched pair에 대해서 변화량을 계산합니다.
+        # 이 때, 앞에 선택했던 sample의 변화량과 threshold 이하의 차이가 난다면? inlier로 간주합니다.
+        for j in range(len(matched_pairs)):
+            if j is not rand:
+                orientation_temp = (keypoints1[matched_pairs[j][0]][3] - keypoints2[matched_pairs[j][1]][3]) % (2*math.pi)
+                scale_temp = keypoints2[matched_pairs[j][1]][2] / keypoints1[matched_pairs[j][0]][2]
+                if((orientation*math.pi/6) < orientation_temp) and (orientation_temp < (orientation+math.pi/6)):
+                    if(scale - scale*scale_agreement < scale_temp and scale_temp < scale + scale*scale_agreement):
+                        temp.append([i, j])
+        # inlier가 가장 많은 경우를 largest_set에 저장합니다.
+        if(len(temp) > len(largest_set)):
+            largest_set = temp
+    # 최종 확정된 largest_set을 image에 반영한다.
+    for i in range(len(largest_set)):
+        largest_set[i] = (matched_pairs[largest_set[i][1]][0], matched_pairs[largest_set[i][1]][1])
 
     ## END
     assert isinstance(largest_set, list)
     return largest_set
-
-
 
 def FindBestMatches(descriptors1, descriptors2, threshold):
     """
@@ -57,9 +80,22 @@ def FindBestMatches(descriptors1, descriptors2, threshold):
     assert isinstance(descriptors2, np.ndarray)
     assert isinstance(threshold, float)
     ## START
-    ## the following is just a placeholder to show you the output format
-    num = 5
-    matched_pairs = [[i, i] for i in range(num)]
+    # hw_utils의 match() 함수에서 호출됩니다.
+    y1 = descriptors1.shape[0]
+    y2 = descriptors2.shape[0] # ReadKey 함수를 통해 탐색된 descriptor
+    temp = np.zeros(y2)
+    matched_pairs = []
+
+    for i in range(y1): # Image descriptor1, 2를 서로 비교합니다.
+        for j in range(y2):
+            temp[j] = math.acos(np.dot(descriptors1[i], descriptors2[j]))
+            # SIFT 방식으로 계산된 descriptor 간의 각도 차이를 계산합니다.
+        compare = sorted(range(len(temp)), key = lambda k : temp[k])
+        # 차이가 적은 matched pair 부터 정렬합니다.
+
+        if(temp[compare[0]]/temp[compare[1]]) < threshold:
+            matched_pairs.append((i, compare[0]))
+        # 두 각도를 나누었을 때, 역치 이하로 차이가 나면 유사하다고 판단합니다.
     ## END
     return matched_pairs
 
@@ -79,9 +115,21 @@ def KeypointProjection(xy_points, h):
     assert isinstance(h, np.ndarray)
     assert xy_points.shape[1] == 2
     assert h.shape == (3, 3)
-
     # START
+    # 결과 배열을 [xy points 갯수, 3] 만큼 1로 채워진 배열로 만든다.
+    # 왜? Homogeneous coordiate를 표현하기 위해 (x, y, 1)로 만드는 것!
+    xy_points_out = np.ones([len(xy_points), 3])
 
+    # xy_points의 크기만큼 순회하며 아래의 연산을 진행한다.
+    for i in range(len(xy_points)):
+        xy_points_out[i][:2] = xy_points[i][:2] # 배열 값 복사
+        xy_points_out[i] = h @ xy_points_out[i] # Homography와 행렬 곱 계산
+        if(xy_points_out[i][2] == 0): # DVZ Exception을 방지하기 위한 correction
+            xy_points_out[i][2] = 1e10
+        xy_points_out[i] /= xy_points_out[i][2]
+        # Homogeneous coordinate를 regular coordinate로 다시 되돌리기 위해 나눠준다.
+        # (x', y', 1)의 형태가 될 것이며, 이후 마지막 열은 제거한다.
+    xy_points_out = np.delete(xy_points_out, 2, axis = 1)
     # END
     return xy_points_out
 
