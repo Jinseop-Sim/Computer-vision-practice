@@ -3,6 +3,8 @@ import cv2
 import math
 import random
 
+import hw_utils as utils
+from PIL import Image
 
 def RANSACFilter(
         matched_pairs, keypoints1, keypoints2,
@@ -161,8 +163,46 @@ def RANSACHomography(xy_src, xy_ref, num_iter, tol):
     tol = tol*1.0
 
     # START
+    # 이미 PrepareData 함수에서 BestMatch를 한 결과가 넘어오므로, 해당 과정은 생략한다.
+    h = []
+    max_inlier_cnt = 0
+    # RANSAC과 유사한 방식으로 Optimal homography를 찾는다.
+    for i in range(num_iter):
+        inlier_cnt = 0
+        diff = [] # xy_ref와 projection 시킨 점간의 거리
+        A = [] # Ah = 0의 식에서, A를 담당할 빈 행렬
+        # main_pano에서 넘어온 xy_src 중 4개의 random point를 선택
+        for _ in range(4):
+            # Random하게 index를 골라 4개의 좌표를 배열에 저장
+            rand_idx = random.randrange(0, len(xy_src))
+            # Ah = 0 공식을 기반으로 Homography를 계산한다
+            # Random으로 뽑은 x, y, x', y'을 행렬식에 대입
+            x, y = xy_src[rand_idx][0], xy_src[rand_idx][1]
+            x_prime, y_prime = xy_ref[rand_idx][0], xy_ref[rand_idx][1]
+            A.append([x, y, 1, 0, 0, 0, -x_prime*x, -x_prime*y, -x_prime])
+            A.append([0, 0, 0, x, y, 1, -y_prime*x, -y_prime*y, -y_prime])
+        
+        # 본격적으로 Homography가 계산되는 부분이다.
+        A = np.asarray(A)
+        # 2n x 9의 직각 행렬 A에 대해 SVD를 계산한다.
+        # 계산된 SVD 중, 직교행렬 V의 마지막 열이 Homography가 된다.
+        U, S, V = np.linalg.svd(A)
+        temp_h = V[-1].reshape((3,3))
+        # 8개의 값을 마지막 값에 대해 나누어 준다.
+        temp_h /= temp_h[2, 2]
 
+        # Homography를 통해 src를 projection 시킨 점과 ref를 이동 시킨 점의 거리차이가 tol 이하면 inlier
+        # inlier를 세어, 가장 많은 경우의 temp_h를 최종 Homography로 정한다.
+        xy_proj_out = KeypointProjection(xy_src, temp_h)
 
+        for i in range(len(xy_src)):
+            diff.append(np.linalg.norm(xy_ref[i] - xy_proj_out[i]))
+            if(diff[-1] < tol):
+                inlier_cnt += 1
+
+        if(inlier_cnt > max_inlier_cnt):
+            max_inlier_cnt = inlier_cnt
+            h = temp_h
 
     # END
     assert isinstance(h, np.ndarray)
