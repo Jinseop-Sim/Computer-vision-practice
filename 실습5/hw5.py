@@ -14,11 +14,15 @@ def compute_fundamental(x1,x2):
         
     F = None
     ### YOUR CODE BEGINS HERE
-    
+    A = []
     # build matrix for equations in Page 51
+    # [uu', vu', u', uv', vv', v', u, v, 1] Matrix를 n개 생성한다.
+    # 그럼 9 * n의 matrix가 생성된다.
+    for i in range(len(x1[0])):
+        A.append([x1[0][i] * x2[0][i], x1[1][i] * x2[0][i], x2[0][i], x1[0][i] * x2[1][i], x1[1][i] * x2[1][i], x2[1][i], x1[0][i], x1[1][i], 1])
     
     # compute the solution in Page 51
-        
+    
     # constrain F: make rank 2 by zeroing out last singular value (Page 52)
 
     ### YOUR CODE ENDS HERE
