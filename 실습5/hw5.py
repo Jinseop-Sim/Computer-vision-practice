@@ -1,12 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
 
-img1 = plt.imread('./data/warrior_a.jpg')
-img2 = plt.imread('./data/warrior_b.jpg')
+img1 = plt.imread('./data/graffiti_a.jpg')
+img2 = plt.imread('./data/graffiti_b.jpg')
 
-cor1 = np.load("./data/warrior_a.npy")
-cor2 = np.load("./data/warrior_b.npy")
+cor1 = np.load("./data/graffiti_a.npy")
+cor2 = np.load("./data/graffiti_b.npy")
 
 def compute_fundamental(x1,x2):
     n = x1.shape[1]
@@ -45,7 +44,6 @@ def compute_fundamental(x1,x2):
     
     return F
 
-
 def compute_norm_fundamental(x1,x2):
     n = x1.shape[1]
     if x2.shape[1] != n:
@@ -72,7 +70,6 @@ def compute_norm_fundamental(x1,x2):
     
     return F
 
-
 def compute_epipoles(F):
     e1 = None
     e2 = None
@@ -90,7 +87,6 @@ def compute_epipoles(F):
     ### YOUR CODE ENDS HERE
     return e1, e2
 
-
 def draw_epipolar_lines(img1, img2, cor1, cor2):
     F = compute_norm_fundamental(cor1, cor2)
 
@@ -99,13 +95,14 @@ def draw_epipolar_lines(img1, img2, cor1, cor2):
     # 점마다 색을 다르게 하기 위해 배열을 미리 선언
     colors = ['#ff8000', '#ff33ff', '#66b2ff', '#ff9999', '#009999', '#660066', '#CC0000', '#cce5ff', '#994c00', '#000000', '#ffffff', '#295510']
     # 직선을 그리기 위해 x좌표들을 미리 선언해놓는다.
-    x1 = range(img1.shape[0])
-    x2 = range(img2.shape[0])
+    x1 = range(img1.shape[1])
+    x2 = range(img2.shape[1])
     # Scatter plot을 이용해 점과 선을 그린다.
     fig, axes = plt.subplots(
-        1, 2, figsize=(10, 6))
+        1, 2, figsize=(12, 6))
 
     axes[0].imshow(img1)
+    axes[0].set_ylim(img1.shape[0], 0)
     for i in range(len(cor1[0])):
         # 먼저 image1의 match point에 해당하는 점들을 찍는다.
         axes[0].scatter(cor1[0][i], cor1[1][i], c = colors[i], s=80, marker='.')
@@ -113,15 +110,16 @@ def draw_epipolar_lines(img1, img2, cor1, cor2):
         m, b = np.polyfit([e1[0], cor1[0][i]], [e1[1], cor1[1][i]], 1)
         # 위에서 구한 기울기와 절편을 이용해 모든 x좌표에 대해 직선을 그린다.
         axes[0].plot(x1, x1*m + b, c = colors[i], linewidth = 1)
-    axes[0].title.set_text('Warrior A')
+    axes[0].title.set_text('Graffiti A')
 
     axes[1].imshow(img2)
+    axes[1].set_ylim(img2.shape[0], 0)
     for i in range(len(cor2[0])):
         # axes[0]과 동일한 순서로 진행한다.
         axes[1].scatter(cor2[0][i], cor2[1][i], c = colors[i], s=80, marker='.')
         m, b = np.polyfit([e2[0], cor2[0][i]], [e2[1], cor2[1][i]], 1)
         axes[1].plot(x2, x2*m + b, c = colors[i], linewidth = 1)
-    axes[1].title.set_text('Warrior B')
+    axes[1].title.set_text('Graffiti B')
 
     fig.show()
     # 아래와 같이 입력을 받지 않으면, show() 함수가 곧바로 종료된다.
