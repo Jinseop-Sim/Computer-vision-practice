@@ -1,1 +1,1 @@
-## Three-layer CNN
+## 실습 6 : Three-layer CNN
